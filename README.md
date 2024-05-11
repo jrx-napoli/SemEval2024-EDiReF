@@ -4,3 +4,8 @@
 ```
 python main.py --experiment_name erc --batch_size 256 --n_epochs 50 --seed 42 --gpuid 0
 ```
+
+#### Task A: ERC on code-mixed Hindi-English MaSaC using BERT
+```
+python main.py --experiment_name erc_bert --batch_size 16 --n_epochs 5 --seed 42 --gpuid 0
+```

@@ -1,19 +1,14 @@
 import json
-import os
-
-import matplotlib.pyplot as plt
 import nltk
 import string
 import torch
+
 from torch.nn.utils.rnn import pad_sequence
-import numpy as np
 from nltk.corpus import stopwords
 from torch.utils.data import DataLoader
 from nltk.stem import PorterStemmer
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer
 from bert_data_wrapper import DialogueDatasetWrapperForBert
-
-import pandas as pd
 
 nltk.download('stopwords')
 
@@ -35,9 +30,10 @@ EMOTIONS_ERC = {
 }
 
 
-# def get_dataloaders(train_dataset_path, val_dataset_path, batch_size):
-#     train_dataloader, val_dataloader = _create_dataloader(train_dataset_path, val_dataset_path, batch_size)
-#     return train_dataloader, val_dataloader
+def get_dataloaders(args):
+    train_dataloader, val_dataloader = _create_dataloader(ERC_DATASET_PATHS['train'], ERC_DATASET_PATHS['val'],
+                                                          args.batch_size)
+    return train_dataloader, val_dataloader
 
 
 def _create_dataloader(train_dataset_path, val_dataset_path, BATCH_SIZE):
@@ -50,13 +46,8 @@ def _create_dataloader(train_dataset_path, val_dataset_path, BATCH_SIZE):
     train_encoded_emotions, train_cleaned_utterances = clean_data(train_data)
     val_encoded_emotions, val_cleaned_utterances = clean_data(val_data)
 
-    # train_padded_sequences = pad_sequence([torch.tensor(seq) for seq in train_cleaned_utterances], batch_first=True,
-    #                                       padding_value=0)
-    # val_padded_sequences = pad_sequence([torch.tensor(seq) for seq in val_cleaned_utterances], batch_first=True,
-    #                                     padding_value=0)
-    #
-    # assert len(train_padded_sequences) == len(train_encoded_emotions)
-    # assert len(val_padded_sequences) == len(val_encoded_emotions)
+    assert len(train_cleaned_utterances) == len(train_encoded_emotions)
+    assert len(val_cleaned_utterances) == len(val_encoded_emotions)
 
     tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
     max_length = find_max_length(train_cleaned_utterances, val_cleaned_utterances)
@@ -71,17 +62,10 @@ def _create_dataloader(train_dataset_path, val_dataset_path, BATCH_SIZE):
                                                     tokenizer=tokenizer,
                                                     max_len=max_length)
 
-    train_loader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=0, collate_fn=lambda x: x )
-    val_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=0, collate_fn=lambda x: x )
-
-    sample_batch = next(iter(train_loader))
-
-    print(sample_batch['utterance'])
-    print(sample_batch['input_id'])
-    print(sample_batch['attention_mask'])
-    print(sample_batch['label'])
-
-
+    train_loader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,
+                              collate_fn=custom_collate_fn)
+    val_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=False, num_workers=0,
+                            collate_fn=custom_collate_fn)
 
     return train_loader, val_loader
 
@@ -113,7 +97,24 @@ def clean_data(dataset):
 
     # Encode emotions
     encoded_emotions = [EMOTIONS_ERC[emotion] for emotion in emotions]
+
     return encoded_emotions, filtered_utterances
 
 
-_create_dataloader(ERC_DATASET_PATHS['train'], ERC_DATASET_PATHS['val'], 16)
+def custom_collate_fn(data):
+    # Custom collate function to pad data dynamically during batch creation
+    utterances = [d['utterance'] for d in data]
+    inputs = [torch.tensor(d['input_id']) for d in data]
+    attention_masks = [torch.tensor(d['attention_mask']) for d in data]
+    labels = [d['label'] for d in data]
+
+    inputs = pad_sequence(inputs, batch_first=True)
+    attention_masks = pad_sequence(attention_masks, batch_first=True)
+    labels = torch.tensor(labels)
+
+    return {
+        'utterance': utterances,
+        'input_id': inputs,
+        'attention_mask': attention_masks,
+        'label': labels
+    }

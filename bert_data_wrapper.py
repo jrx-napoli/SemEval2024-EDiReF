@@ -13,14 +13,15 @@ class DialogueDatasetWrapperForBert(Dataset):
         return len(self.utterance)
 
     def __getitem__(self, index):
-        utterance = self.utterance[index]
+        utterance = " ".join(self.utterance[index])
+        label = self.label[index]
         encoding = self.tokenizer.encode_plus(
             utterance,
             add_special_tokens=True,
             max_length=self.max_len,
             truncation=True,
             return_token_type_ids=False,
-            padding='max_length',
+            padding='longest',
             return_attention_mask=True,
             return_tensors='pt'
         )
@@ -28,5 +29,5 @@ class DialogueDatasetWrapperForBert(Dataset):
         return {'utterance': utterance,
                 'input_id': encoding['input_ids'].flatten(),
                 'attention_mask': encoding['attention_mask'].flatten(),
-                'label': torch.tensor(self.label[index], dtype=torch.long)
+                'label': torch.tensor(label, dtype=torch.long)
                 }
