@@ -51,7 +51,8 @@ def get_correct_sum(y_pred, y_test):
 
 def train_bert(model, train_dataloader, n_epochs, device):
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    #optimizer = optim.Adam(model.parameters(), lr=1e-3)
     total_steps = n_epochs * len(train_dataloader)
     scheduler = transformers.get_linear_schedule_with_warmup(optimizer=optimizer,
                                                              num_warmup_steps=0,
@@ -76,11 +77,11 @@ def train_bert(model, train_dataloader, n_epochs, device):
             _, pred_classes = torch.max(predictions, dim=1)
 
             #back
+            optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm(model.parameters(), max_norm=1.0)
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             scheduler.step()
-            optimizer.zero_grad()
 
             with torch.no_grad():
                 train_loss.append(loss.item())
