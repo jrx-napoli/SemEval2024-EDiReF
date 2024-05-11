@@ -47,7 +47,7 @@ def evaluate_bert(model, data_loader, device):
         _, pred_classes = torch.max(predictions, dim=1)
 
         eval_loss.append(loss.item())
-        accurate_predictions += torch.sum(pred_classes == labels)
+        accurate_predictions += torch.sum(pred_classes == labels).cpu().numpy()
         all_predictions.extend(pred_classes.cpu().numpy())
         all_labels.extend(labels.cpu().numpy())
 

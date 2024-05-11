@@ -85,7 +85,7 @@ def train_bert(model, train_dataloader, n_epochs, device):
 
             with torch.no_grad():
                 train_loss.append(loss.item())
-                accurate_predictions += torch.sum(pred_classes==labels)
+                accurate_predictions += torch.sum(pred_classes==labels).cpu().numpy()
 
         duration = time.time() - start
 
