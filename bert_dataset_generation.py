@@ -2,6 +2,7 @@ import json
 import nltk
 import string
 import torch
+import numpy as np
 
 from torch.nn.utils.rnn import pad_sequence
 from nltk.corpus import stopwords
@@ -9,8 +10,11 @@ from torch.utils.data import DataLoader
 from nltk.stem import PorterStemmer
 from transformers import BertTokenizer
 from bert_data_wrapper import DialogueDatasetWrapperForBert
+from sklearn.utils.class_weight import compute_class_weight
 
-nltk.download('stopwords')
+
+if not nltk.corpus.stopwords.words('english'):
+    nltk.download('stopwords')
 
 ERC_DATASET_PATHS = {
     "train": "data/erc/MaSaC_train_erc.json",
@@ -62,9 +66,9 @@ def _create_dataloader(train_dataset_path, val_dataset_path, BATCH_SIZE):
                                                     tokenizer=tokenizer,
                                                     max_len=max_length)
 
-    train_loader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,
+    train_loader = DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, num_workers=12,
                               collate_fn=custom_collate_fn)
-    val_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=False, num_workers=0,
+    val_loader = DataLoader(validation_data, batch_size=BATCH_SIZE, shuffle=False, num_workers=12,
                             collate_fn=custom_collate_fn)
 
     return train_loader, val_loader
@@ -104,8 +108,11 @@ def clean_data(dataset):
 def custom_collate_fn(data):
     # Custom collate function to pad data dynamically during batch creation
     utterances = [d['utterance'] for d in data]
-    inputs = [torch.tensor(d['input_id']) for d in data]
-    attention_masks = [torch.tensor(d['attention_mask']) for d in data]
+    #inputs = [torch.tensor(d['input_id']) for d in data]
+    inputs = [torch.tensor(d['input_id']).clone().detach() if not isinstance(d['input_id'], torch.Tensor) else d['input_id'].clone().detach() for d in data]
+
+    #attention_masks = [torch.tensor(d['attention_mask']) for d in data]
+    attention_masks = [torch.tensor(d['attention_mask']).clone().detach() if not isinstance(d['attention_mask'], torch.Tensor) else d['attention_mask'].clone().detach() for d in data]
     labels = [d['label'] for d in data]
 
     inputs = pad_sequence(inputs, batch_first=True)
@@ -118,3 +125,14 @@ def custom_collate_fn(data):
         'attention_mask': attention_masks,
         'label': labels
     }
+
+
+def calculate_class_weights(labels, device):
+    # class_counts = np.bincount(labels)
+    # total_samples = len(labels)
+    # class_weights = [total_samples / count for count in class_counts]
+    class_wts = compute_class_weight(class_weight='balanced', classes=np.unique(labels), y=labels)
+    class_weights = torch.tensor(class_wts, dtype=torch.float)
+    class_weights = class_weights.to(device)
+    print(class_weights)
+    return class_weights

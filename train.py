@@ -1,10 +1,11 @@
 import time
-
 import numpy as np
 import torch
 import torch.nn as nn
-from torch import optim
 import transformers
+
+from torch import optim
+from bert_dataset_generation import calculate_class_weights
 
 
 def train(model, train_dataloader, n_epochs, device):
@@ -50,9 +51,14 @@ def get_correct_sum(y_pred, y_test):
 
 
 def train_bert(model, train_dataloader, n_epochs, device):
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    #optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    labels = []
+    for batch in train_dataloader:
+        labels.extend(batch['label'].numpy())
+    class_weights = calculate_class_weights(labels, device)
+
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    #optimizer = optim.SGD(model.parameters(), lr=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=1e-5)
     total_steps = n_epochs * len(train_dataloader)
     scheduler = transformers.get_linear_schedule_with_warmup(optimizer=optimizer,
                                                              num_warmup_steps=0,
@@ -71,13 +77,16 @@ def train_bert(model, train_dataloader, n_epochs, device):
             attention_masks = batch['attention_mask'].to(device)
             labels = batch['label'].to(device)
 
+            optimizer.zero_grad()
+
             #forward
             predictions = model(input_ids, attention_masks)
             loss = criterion(predictions, labels)
             _, pred_classes = torch.max(predictions, dim=1)
+            # if epoch == 19:
+            #     print(pred_classes)
 
             #back
-            optimizer.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()

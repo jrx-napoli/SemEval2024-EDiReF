@@ -8,6 +8,7 @@ from bert_model import BERT
 from options import get_args
 from setup import setup_devices
 from train import train, train_bert
+import torch
 
 
 def run(args):
